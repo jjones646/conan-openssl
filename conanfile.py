@@ -1,18 +1,25 @@
+import os
+import conans
+import semver
+import subprocess
+
 from conans import ConanFile, AutoToolsBuildEnvironment
 from conans import tools
-import os
-import subprocess
+
+# fail if using an old version of conan
+required_conan_version = '0.28.0'
+assert semver.gte(conans.__version__, required_conan_version, loose=True), 'Not compatible with Conan version {!s}. You must use Conan version {!s} or greater.'.format(conans.__version__, required_conan_version)
 
 
 class OpenSSLConan(ConanFile):
-    name = "OpenSSL"
-    version = "1.0.2l"
+    name = 'OpenSSL'
+    version = '1.0.2-m'  # hyphen is added to version number to make it semver compliant
     settings = "os", "compiler", "arch", "build_type"
-    url = "http://github.com/lasote/conan-openssl"
+    url = "http://github.com/jjones646/conan-openssl"
     license = "The current OpenSSL licence is an 'Apache style' license: https://www.openssl.org/source/license.html"
     description = "OpenSSL is an open source project that provides a robust, commercial-grade, and full-featured " \
                   "toolkit for the Transport Layer Security (TLS) and Secure Sockets Layer (SSL) protocols"
-    # https://github.com/openssl/openssl/blob/OpenSSL_1_0_2l/INSTALL
+    # https://github.com/openssl/openssl/blob/OpenSSL_1_0_2m/INSTALL
     options = {"no_threads": [True, False],
                "no_zlib": [True, False],
                "shared": [True, False],
@@ -35,9 +42,22 @@ class OpenSSLConan(ConanFile):
                "no_sha": [True, False]}
     default_options = "=False\n".join(options.keys()) + "=False"
 
+    @property
+    def version_exact(self):
+        return self.version.replace('-', '')
+
+    @property
+    def source_tgz(self):
+        return 'https://www.openssl.org/source/openssl-{!s}.tar.gz'.format(self.version_exact)
+
     # When a new version is available they move the tar.gz to old/ location
-    source_tgz = "https://www.openssl.org/source/openssl-%s.tar.gz" % version
-    source_tgz_old = "https://www.openssl.org/source/old/1.0.2/openssl-%s.tar.gz" % version
+    @property
+    def source_tgz_old(self):
+        return 'https://www.openssl.org/source/old/1.0.2/openssl-{!s}.tar.gz'.format(self.version_exact)
+
+    @property
+    def subfolder(self):
+        return 'openssl-{!s}'.format(self.version_exact)
 
     def build_requirements(self):
         # useful for example for conditional build_requires
@@ -47,13 +67,13 @@ class OpenSSLConan(ConanFile):
                 self.build_requires("nasm/2.13.01@conan/stable")
 
     def source(self):
-        self.output.info("Downloading %s" % self.source_tgz)
+        self.output.info('Downloading {!s}'.format(self.source_tgz))
         try:
             tools.download(self.source_tgz_old, "openssl.tar.gz")
-        except:
+        except Exception:
             tools.download(self.source_tgz, "openssl.tar.gz")
         tools.unzip("openssl.tar.gz")
-        tools.check_sha256("openssl.tar.gz", "ce07195b659e75f4e1db43552860070061f156a98bb37b672b101ba6e3ddf30c")
+        tools.check_sha256("openssl.tar.gz", "8c6ff15ec6b319b50788f42c7abc2890c08ba5a1cdcd3810eb9092deada37b0f")
         os.unlink("openssl.tar.gz")
 
     def configure(self):
@@ -61,11 +81,7 @@ class OpenSSLConan(ConanFile):
 
     def requirements(self):
         if not self.options.no_zlib:
-            self.requires("zlib/1.2.11@conan/stable")
-
-    @property
-    def subfolder(self):
-        return "openssl-%s" % self.version
+            self.requires("zlib/[~=1.2]@jjones646/stable")
 
     def build(self):
         """
@@ -87,8 +103,8 @@ class OpenSSLConan(ConanFile):
             config_options_string += ' --with-zlib-include="%s"' % include_path
             config_options_string += ' --with-zlib-lib="%s"' % lib_path
 
-            tools.replace_in_file("./openssl-%s/Configure" % self.version, "::-lefence::", "::")
-            tools.replace_in_file("./openssl-%s/Configure" % self.version, "::-lefence ", "::")
+            tools.replace_in_file("./openssl-%s/Configure" % self.version_exact, "::-lefence::", "::")
+            tools.replace_in_file("./openssl-%s/Configure" % self.version_exact, "::-lefence ", "::")
             self.output.info("=====> Options: %s" % config_options_string)
 
         for option_name in self.options.values.fields:
@@ -170,7 +186,7 @@ class OpenSSLConan(ConanFile):
         self.output.warn(config_line)
         self.run_in_src(config_line)
         self.run_in_src("make depend")
-        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version)
+        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version_exact)
         self.run_in_src("make")
 
     def ios_build(self, config_options_string):
@@ -232,8 +248,8 @@ class OpenSSLConan(ConanFile):
         # DYNLIBS IDS AND OTHER DYNLIB DEPS WITHOUT PATH, JUST THE LIBRARY NAME
         old_str = 'SHAREDFLAGS="$$SHAREDFLAGS -install_name $(INSTALLTOP)/$(LIBDIR)/$$SHLIB$'
         new_str = 'SHAREDFLAGS="$$SHAREDFLAGS -install_name $$SHLIB$'
-        tools.replace_in_file("./openssl-%s/Makefile.shared" % self.version, old_str, new_str)
-        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version)
+        tools.replace_in_file("./openssl-%s/Makefile.shared" % self.version_exact, old_str, new_str)
+        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version_exact)
         self.run_in_src("make")
 
     def osx_build(self, config_options_string):
@@ -248,14 +264,14 @@ class OpenSSLConan(ConanFile):
         # DYNLIBS IDS AND OTHER DYNLIB DEPS WITHOUT PATH, JUST THE LIBRARY NAME
         old_str = 'SHAREDFLAGS="$$SHAREDFLAGS -install_name $(INSTALLTOP)/$(LIBDIR)/$$SHLIB$'
         new_str = 'SHAREDFLAGS="$$SHAREDFLAGS -install_name $$SHLIB$'
-        tools.replace_in_file("./openssl-%s/Makefile.shared" % self.version, old_str, new_str)
-        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version)
+        tools.replace_in_file("./openssl-%s/Makefile.shared" % self.version_exact, old_str, new_str)
+        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version_exact)
         self.run_in_src("make")
 
     def visual_build(self, config_options_string):
         self.run_in_src("perl --version")
 
-        self.output.warn("----------CONFIGURING OPENSSL FOR WINDOWS. %s-------------" % self.version)
+        self.output.warn("----------CONFIGURING OPENSSL FOR WINDOWS. %s-------------" % self.version_exact)
         debug = "debug-" if self.settings.build_type == "Debug" else ""
         arch = "32" if self.settings.arch == "x86" else "64A"
         configure_type = debug + "VC-WIN" + arch
@@ -278,17 +294,17 @@ class OpenSSLConan(ConanFile):
                 self.run_in_src(r"%s && ms\do_ms" % vcvars)
         runtime = self.settings.compiler.runtime
         # Replace runtime in ntdll.mak and nt.mak
-        tools.replace_in_file("./openssl-%s/ms/ntdll.mak" % self.version, "/MD ", "/%s " % runtime,
+        tools.replace_in_file("./openssl-%s/ms/ntdll.mak" % self.version_exact, "/MD ", "/%s " % runtime,
                               strict=False)
-        tools.replace_in_file("./openssl-%s/ms/nt.mak" % self.version, "/MT ", "/%s " % runtime,
+        tools.replace_in_file("./openssl-%s/ms/nt.mak" % self.version_exact, "/MT ", "/%s " % runtime,
                               strict=False)
-        tools.replace_in_file("./openssl-%s/ms/ntdll.mak" % self.version, "/MDd ", "/%s " % runtime,
+        tools.replace_in_file("./openssl-%s/ms/ntdll.mak" % self.version_exact, "/MDd ", "/%s " % runtime,
                               strict=False)
-        tools.replace_in_file("./openssl-%s/ms/nt.mak" % self.version, "/MTd ", "/%s " % runtime,
+        tools.replace_in_file("./openssl-%s/ms/nt.mak" % self.version_exact, "/MTd ", "/%s " % runtime,
                               strict=False)
 
         make_command = "nmake -f ms\\ntdll.mak" if self.options.shared else "nmake -f ms\\nt.mak "
-        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version)
+        self.output.warn("----------MAKE OPENSSL %s-------------" % self.version_exact)
         self.run_in_src("%s && %s" % (vcvars, make_command))
         self.run_in_src("%s && %s install" % (vcvars, make_command))
         # Rename libs with the arch
@@ -310,7 +326,7 @@ class OpenSSLConan(ConanFile):
         self.output.warn(config_line)
         with tools.chdir(self.subfolder):
             tools.run_in_windows_bash(self, config_line)
-            self.output.warn("----------MAKE OPENSSL %s-------------" % self.version)
+            self.output.warn("----------MAKE OPENSSL %s-------------" % self.version_exact)
             # tools.run_in_windows_bash(self, "make depend")
             tools.run_in_windows_bash(self, "make")
 

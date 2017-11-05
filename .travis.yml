@@ -1,14 +1,10 @@
 
 env:
    global:
-     - CONAN_REFERENCE: "OpenSSL/1.0.2l"
-     - CONAN_USERNAME: "conan"
-     - CONAN_LOGIN_USERNAME: "lasote"
-     - CONAN_CHANNEL: "testing"
-     - CONAN_UPLOAD: "https://api.bintray.com/conan/conan-community/conan"
-     - CONAN_STABLE_BRANCH_PATTERN: "release/*"
+     - CONAN_REFERENCE: "OpenSSL/1.0.2-m"
+     - CONAN_USERNAME: "jjones646"
+     - CONAN_CHANNEL: "stable"
      - CONAN_TOTAL_PAGES: 2
-     - CONAN_UPLOAD_ONLY_WHEN_STABLE: 1 # Will only upload when the branch matches "release/*"
 
 linux: &linux
    os: linux

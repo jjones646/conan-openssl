@@ -1,19 +1,11 @@
-PROJECT(MyHello)
-cmake_minimum_required(VERSION 2.8)
+project( OpenSSLConanPackageTest )
+cmake_minimum_required( VERSION  3.0 )
+include( "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake" )
+conan_basic_setup( TARGETS )
 
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-CONAN_BASIC_SETUP()
-
-find_package(OpenSSL)
-
-IF(OPENSSL_FOUND)
-    include_directories(${OPENSSL_INCLUDE_DIRS})
-    ADD_EXECUTABLE(md5 md5.cpp)
-    TARGET_LINK_LIBRARIES(md5 ${OPENSSL_LIBRARIES})
-    if((UNIX AND NOT APPLE) OR WIN32)
-        MESSAGE("LINK WITH ${CONAN_LIBS}")
-        TARGET_LINK_LIBRARIES(md5 ${CONAN_LIBS})
-    endif()
-ELSE()
-    MESSAGE(FATAL_ERROR "ERROR! OPENSSL NOT FOUND!")
-ENDIF()
+add_executable( OpenSSLPackageTest
+    md5.cpp
+)
+target_link_libraries( OpenSSLPackageTest
+    PRIVATE  CONAN_PKG::OpenSSL
+)
